@@ -36,17 +36,21 @@ function __localRequire(fromId, request) {
   return module.exports;
 }
 
-const token = process.env.DISCORD_TOKEN;
-const clientId = process.env.CLIENT_ID;
-const guildId = process.env.GUILD_ID;
-
-if (!token || token === 'COLOQUE_SEU_TOKEN_AQUI' || token === 'SEU_TOKEN_DO_BOT') {
-  console.error('❌ DISCORD_TOKEN não configurado no .env');
-  process.exit(1);
+function cleanEnv(value, name) {
+  let result = String(value || '').trim();
+  if (result.startsWith(`${name}=`)) result = result.slice(name.length + 1).trim();
+  if ((result.startsWith('\"') && result.endsWith('\"')) || (result.startsWith("'") && result.endsWith("'"))) {
+    result = result.slice(1, -1).trim();
+  }
+  return result;
 }
 
-if (!clientId || clientId === 'COLOQUE_O_CLIENT_ID_AQUI' || clientId === 'ID_DO_BOT') {
-  console.error('❌ CLIENT_ID não configurado no .env');
+const token = cleanEnv(process.env.DISCORD_TOKEN, 'DISCORD_TOKEN');
+const clientIdFromEnv = cleanEnv(process.env.CLIENT_ID, 'CLIENT_ID');
+const guildId = cleanEnv(process.env.GUILD_ID, 'GUILD_ID');
+
+if (!token || token === 'COLOQUE_SEU_TOKEN_AQUI' || token === 'SEU_TOKEN_DO_BOT') {
+  console.error('❌ DISCORD_TOKEN não configurado nas Variables do Railway');
   process.exit(1);
 }
 
@@ -75,13 +79,21 @@ for (const id of commandIds) {
 
 async function registerCommands() {
   const rest = new REST({ version: '10' }).setToken(token);
+  const applicationId = client.application?.id || clientIdFromEnv;
+
+  if (!applicationId) {
+    throw new Error('Não consegui pegar o ID do aplicativo. Confira o token do bot.');
+  }
+
   const configuredGuildId = guildId && guildId !== 'COLOQUE_O_ID_DO_SEU_SERVIDOR_AQUI' && guildId !== 'ID_DO_SEU_SERVIDOR' ? guildId : null;
 
+  console.log(`📌 Registrando comandos usando Application ID: ${applicationId}`);
+
   if (configuredGuildId) {
-    await rest.put(Routes.applicationGuildCommands(clientId, configuredGuildId), { body: commandsJson });
+    await rest.put(Routes.applicationGuildCommands(applicationId, configuredGuildId), { body: commandsJson });
     console.log(`✅ ${commandsJson.length} comandos registrados no servidor ${configuredGuildId}.`);
   } else {
-    await rest.put(Routes.applicationCommands(clientId), { body: commandsJson });
+    await rest.put(Routes.applicationCommands(applicationId), { body: commandsJson });
     console.log(`✅ ${commandsJson.length} comandos globais registrados. Pode demorar para aparecer.`);
   }
 }
